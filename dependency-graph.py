@@ -13,7 +13,10 @@ import yaml
 import visdcc
 from scripts import cypherNeo4j
 from scripts.appProps import convertYamlTojson
+import redis
 
+
+redis_db = redis.StrictRedis(host="localhost", charset="utf-8", port=6379, db=0, decode_responses=True)
 
 
 ###########################
@@ -118,8 +121,19 @@ def get_sample_visdcc():
 
 def get_graph(comp,tab,subcomp=None):
 
-    graph, document = cypherNeo4j.authenticate_and_load_json(comp)
-    result = cypherNeo4j.generate_graph(graph,document,tab,comp,subcomp)
+    if(subcomp is not None):
+        redis_key = comp+":"+tab+":"+subcomp
+    else:
+        redis_key = comp+":"+tab
+
+    cache_result = redis_db.get(redis_key)
+    if(cache_result is not None):
+        result = json.loads(cache_result)
+    else:
+        graph, document = cypherNeo4j.authenticate_and_load_json(comp)
+        result = cypherNeo4j.generate_graph(graph,document,tab,comp,subcomp)
+        cache_result = json.dumps(result)
+        redis_db.set(redis_key,cache_result)
 
     visual = visdcc.Network(id='net',
              options = dict(height= '600px',
@@ -137,9 +151,8 @@ def get_graph(comp,tab,subcomp=None):
              },
              layout={'improvedLayout':True},
              ),
-
-    data=result
-    )
+             data=result
+             )
     return visual
 
 
