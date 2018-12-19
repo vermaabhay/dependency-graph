@@ -18,11 +18,22 @@ from scripts.getUpdatedYaml import updateYamls
 from scripts.redisCache import expireCache
 from flask import redirect
 from scripts.time_tracker import TimeTracker
+import logging
+
+
+logfile = "/var/log/dependency-graph/dependency-graph.log"
+logging.basicConfig(filename=logfile, level=logging.INFO, format='%(asctime)s  [%(levelname)s]  %(message)s')
+
 
 time_tracker = TimeTracker()
 
-
 redis_db = redis.StrictRedis(host="localhost", charset="utf-8", port=6379, db=0, decode_responses=True)
+
+neo4j_host = "localhost"
+#neo4j_http_port = 7474
+#neo4j_bolt_port = 7687
+neo4j_user = ""
+neo4j_pass = ""
 
 
 ###########################
@@ -42,10 +53,12 @@ def get_header():
 def get_tabs():
     get_tabs = html.Div([
         dcc.Tabs(id="tabs", value='CompGraph', children=[
-                dcc.Tab(label='Component Graph', value='CompGraph'),
-                dcc.Tab(label='Component Dependency Graph', value='CompDepGraph'),
-                dcc.Tab(label='SubComponent Dependency Graph', value='SubCompDepGraph'),
-                dcc.Tab(label='Component Component Dependency Graph', value='CompCompDepGraph'),
+                dcc.Tab(label='Comp Graph', value='CompGraph'),
+                dcc.Tab(label='Comp Dependency', value='CompDepGraph'),
+                dcc.Tab(label='SubComp Dependency', value='SubCompDepGraph'),
+                dcc.Tab(label='Comp Comp Dependency', value='CompCompDepGraph'),
+                dcc.Tab(label='ConnectsTo Comp', value='ConnToComp'),
+                dcc.Tab(label='ConnectsTo SubComp', value='ConnToSubComp'),
             ]),
         html.Div(id='tab-output')
         ])
@@ -125,7 +138,7 @@ def get_sample_visdcc():
     return sample_visdcc
 
 
-@time_tracker.time_track()
+#@time_tracker.time_track()
 def get_graph(comp,tab,subcomp=None):
 
     if(subcomp is not None):
@@ -142,14 +155,23 @@ def get_graph(comp,tab,subcomp=None):
     if(cache_result is not None):
         result = json.loads(cache_result)
     else:
-        graph, document = cypherNeo4j.authenticate_and_load_json(comp)
+        if(tab == 'ConnToComp' or tab == 'ConnToSubComp'):
+            neo4j_http_port = 8474
+            neo4j_bolt_port = 8687
+            graph, document = cypherNeo4j.authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,comp)
+        else:
+            neo4j_http_port = 7474
+            neo4j_bolt_port = 7687
+            graph, document = cypherNeo4j.authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,comp)
+
         result = cypherNeo4j.generate_graph(graph,document,tab,comp,subcomp)
         cache_result = json.dumps(result)
-  
-        try:
-            redis_db.set(redis_key,cache_result)
-        except Exception as err:
-            print("Can't Write To Redis:",err)
+            
+        if(cache_result is not None or cache_result != ""):
+            try:
+                redis_db.set(redis_key,cache_result)
+            except Exception as err:
+                print("Can't Write To Redis:",err)
 
     visual = visdcc.Network(id='net',
              options = dict(height= '600px',
@@ -184,8 +206,8 @@ server = app.server
 
 app.title = 'Dependency Graph'
 app.config['suppress_callback_exceptions']=True
-app.css.config.serve_locally = True
-app.scripts.config.serve_locally = True
+#app.css.config.serve_locally = True
+#app.scripts.config.serve_locally = True
 
 app.layout = html.Div([
      get_header(),
@@ -210,6 +232,10 @@ def display_content(tab):
         return display_comp_subcomp()
     elif tab == 'CompCompDepGraph':
         return display_comp()
+    elif tab == 'ConnToComp':
+        return display_comp()
+    elif tab == 'ConnToSubComp':
+        return display_comp_subcomp()
     else:
         return None
 
