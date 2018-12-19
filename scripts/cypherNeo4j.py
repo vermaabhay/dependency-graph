@@ -66,22 +66,32 @@ def draw(graph, options, tab, comp, subcomp=None):
 
 
     def get_vis_info(node, id):
-        node_labels = list(node.labels())
+        #node_labels = list(node.labels())
+
+        node_labels = str(node.labels).split(":")
+        node_labels.remove("")
+
         if(len(node_labels) > 1):
             for node_label in node_labels:
                 if(node_label == "SubComponent"):
                     group = node_label
                     prop_key = options.get(node_label)
-                    vis_label = node.properties.get(prop_key, "")
+                    #vis_label = node.properties.get(prop_key, "")
+                    vis_label = node.get(prop_key, "")
                 if(node_label == "Type"):
                     prop_key = options.get(node_label)
-                    app_type = node.properties.get(prop_key, "")
+                    app_type = node.get(prop_key, "")
                     image_url = appImage(app_type)
             return {"id": id, "label": vis_label, "group": group, "shape":"image", "image":image_url}
         else:
-            node_label = list(node.labels())[0]
+            #node_label = list(node.labels())[0]
+
+            node_labels = str(node.labels).split(":")
+            node_labels.remove("")
+            node_label = node_labels[0]
+
             prop_key = options.get(node_label)
-            vis_label = node.properties.get(prop_key, "")
+            vis_label = node.get(prop_key, "")
             if(node_label == "Component" or node_label == "ComponentDependency"):
                 image_url = appImage('default')
             else:
@@ -96,27 +106,29 @@ def draw(graph, options, tab, comp, subcomp=None):
         rel = row[2]
         target_node = row[3]
         target_id = row[4]
-        print(row)
-        print(source_node)
-        print(source_id)
-        print(rel)
-        print(target_node)
-        print(target_id)
 
-        source_info = get_vis_info(source_node, source_id)
+        if source_node is not None:
+            source_info = get_vis_info(source_node, source_id)
 
-        if source_info not in nodes:
-            nodes.append(source_info)
+            if source_info not in nodes:
+                nodes.append(source_info)
 
-        if rel is not None:
+        if(rel is not None):
             target_info = get_vis_info(target_node, target_id)
 
             if target_info not in nodes:
                 nodes.append(target_info)
             
             edge_id = str(source_info["id"])+"-"+str(target_info["id"])
-            edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()})
-            print(rel.type())
+            #v3
+            #edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()}) 
+            #v4
+            edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel["name"]})
+
+        if(source_node is None and rel is None and target_node is not None):
+            target_info = get_vis_info(target_node, target_id)
+            if target_info not in nodes:
+                nodes.append(target_info)
 
     result = {'nodes':nodes,'edges':edges}
     #return result
@@ -127,9 +139,9 @@ def draw(graph, options, tab, comp, subcomp=None):
         return result
 
 
-def get_dependency_data(graph,value):
+def get_graph_data(graph,value):
 
-    query_comp = """
+    query_common_dep_comp = """
     MATCH (comp:Component)-[:ConnectsTo]->(depcomps:Component)
     WITH comp, depcomps ORDER BY depcomps.name
     WITH comp, COLLECT(depcomps.name) AS Dependent_Components, COUNT(depcomps) AS Dep_Count
@@ -139,7 +151,7 @@ def get_dependency_data(graph,value):
     RETURN Components, Dependent_Components
     ORDER BY Dep_Count
     """
-    query_subcomp = """
+    query_common_dep_subcomp = """
     MATCH (subcomp:SubComponent)-[:ConnectsTo]->(depsubcomps:SubComponent)
     WITH subcomp, depsubcomps ORDER BY depsubcomps.name
     WITH subcomp, COLLECT(depsubcomps.name) AS Dependent_SubComponents, COUNT(depsubcomps) AS Dep_Count
@@ -150,23 +162,51 @@ def get_dependency_data(graph,value):
     ORDER BY Dep_Count
     """
 
+    query_circular_dep_subcomp = """
+    MATCH (subcomp:SubComponent)-[:ConnectsTo]->(depsubcomp:SubComponent)
+    WHERE subcomp.name = depsubcomp.name
+    WITH split(subcomp.name,":") AS var
+    WITH var[0] as Components, collect(var[1]) as SubComponents, COUNT(var[1]) AS SubComp_Count
+    RETURN Components, SubComponents
+    ORDER BY SubComp_Count
+    """
+ 
+    query_standalone_subcomp = """
+    MATCH (n:SubComponent)
+    WHERE NOT(()-[:ConnectsTo]->(n:SubComponent)) AND NOT ((n:SubComponent)-[:ConnectsTo]->())
+    WITH split(n.name,":") AS var
+    WITH var[0] as Components, collect(var[1]) as SubComponents, COUNT(var[1]) AS SubComp_Count
+    RETURN Components, SubComponents
+    ORDER BY SubComp_Count
+    """
 
-    if(value == 'comp'):
-        query = query_comp
+    if(value == 'commDepcomp'):
+        query = query_common_dep_comp
+    elif(value == 'commDepsubcomp'):
+        query = query_common_dep_subcomp
+    elif(value == 'cirDepsubcomp'):
+        query = query_circular_dep_subcomp
+    elif(value == 'stndAlonesubcomp'):
+        query = query_standalone_subcomp
     else:
-        query = query_subcomp
+        query = None
 
     data =  graph.run(query)
-    df = DataFrame(list(map(dict, data)))
-    print(df)
-    return df
+    #df = DataFrame(list(map(dict, data)))
+    df = data.to_data_frame()
+    return df,value
 
 
 def authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass):
     
     #authenticate("localhost:7474", "", "")
     #v3
-    graph = Graph(bolt=False, host=neo4j_host, http_port=neo4j_http_port, bolt_port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
+    #graph = Graph(bolt=False, host=neo4j_host, http_port=neo4j_http_port, bolt_port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
+    
+    #v4
+    graph = Graph(host=neo4j_host, port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
+    
+    
    
     if(neo4j_http_port == 7474):
         graph.delete_all()
@@ -189,7 +229,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND document.subcomponents AS subcomponent
     MERGE (comp:Component {name: document.component})
     MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
-    CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
+    CREATE UNIQUE (comp)-[:SubComponent {name: "SubComponent"}]->(subcomp)
     """
 
     query_subcomp = """
@@ -205,7 +245,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     WHERE subcomponent.name = {subCompName}
     MERGE (subcomp:SubComponent:Type {name: document.component+":"+subcomponent.name, type:subcomponent.type})
     MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
-    CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
+    CREATE UNIQUE (subcomp)-[:ConnectsTo {name: "ConnectsTo"}]->(scd)
     """
 
     query_subcomp_graph_fallback = """
@@ -238,13 +278,13 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     MERGE (comp:Component {name: document.component})
     MERGE (subcomp:SubComponent:Type {name: document.component+":"+subcomponent.name, type:subcomponent.type})
     MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
-    CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
-    CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
+    CREATE UNIQUE (comp)-[:SubComponent {name: "SubComponent"}]->(subcomp)
+    CREATE UNIQUE (subcomp)-[:ConnectsTo {name: "ConnectsTo"}]->(scd)
     WITH document,subcomponent,dependency
     WHERE document.component = dependency.component
     MERGE (cd:Component {name: dependency.component})
     MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
-    CREATE UNIQUE (cd)-[:SubComponent]->(scd)
+    CREATE UNIQUE (cd)-[:SubComponent {name: "SubComponent"}]->(scd)
     """
 
     query_comp_comp_dependency_graph = """
@@ -252,8 +292,8 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND document.subcomponents AS subcomponent
     UNWIND subcomponent.dependencies AS dependency
     MERGE (comp:Component {name: document.component})
-    MERGE (cd:ComponentDependency {name: dependency.component})
-    CREATE UNIQUE (comp)-[:ConnectsTo]->(cd)
+    MERGE (cd:Component {name: dependency.component})
+    CREATE UNIQUE (comp)-[:ConnectsTo {name: "ConnectsTo"}]->(cd)
     """
 
 
@@ -261,7 +301,6 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     #graph.run(query_comp_dependency, json = doc).dump()
 
 
-    data = {'component': None, 'subcomponent': None}
    
     graph_query = {'CompGraph':query_comp_graph,
                    'CompDepGraph':query_comp_subcomp_dependency_graph,
@@ -270,15 +309,15 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
                    }
     query = graph_query.get(tab)
     if(query != None):
-        run = graph.run(query, json=doc, subCompName=subCompName, data=data)
+        data = graph.run(query, json=doc, subCompName=subCompName)
 
-    if(tab == 'SubCompDepGraph' and run.dump() is None):
+    if(tab == 'SubCompDepGraph'):
         query = query_subcomp_graph_fallback
-        graph.run(query, json=doc, subCompName=subCompName, data=data)
+        data = graph.run(query, json=doc, subCompName=subCompName)
     ###########
 
-    options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name","Type":"type"}
-    #options = {"Component":"name","SubComponent":"name","Type":"type"}
+    #options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name","Type":"type"}
+    options = {"Component":"name","SubComponent":"name","Type":"type"}
 
     result = draw(graph,options,tab,compName,subCompName)
     return result
