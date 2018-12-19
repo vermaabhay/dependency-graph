@@ -27,7 +27,7 @@ def draw(graph, options, physics=False):
            id(m) AS target_id
     """
 
-    data = graph.run(query,limit=1000)
+    data = graph.run(query,limit=10000)
 
     nodes = []
     edges = []
@@ -140,17 +140,17 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND subcomponent.dependencies AS dependency
     WITH document,subcomponent,dependency
     WHERE subcomponent.name = {subCompName}
-    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
-    MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
+    MERGE (subcomp:SubComponent:Type {name: document.component+":"+subcomponent.name, type:subcomponent.type})
+    MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
     """
 
     query_subcomp_graph_fallback = """
     WITH {json} AS document
     UNWIND document.subcomponents AS subcomponent
-    WITH subcomponent
+    WITH document,subcomponent
     WHERE subcomponent.name = {subCompName}
-    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
+    MERGE (subcomp:SubComponent:Type {name: document.component+":"+subcomponent.name, type:subcomponent.type})
     """
 
 
@@ -173,14 +173,14 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND document.subcomponents AS subcomponent
     UNWIND subcomponent.dependencies AS dependency
     MERGE (comp:Component {name: document.component})
-    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
-    MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
+    MERGE (subcomp:SubComponent:Type {name: document.component+":"+subcomponent.name, type:subcomponent.type})
+    MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
     CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
     WITH document,subcomponent,dependency
     WHERE document.component = dependency.component
     MERGE (cd:Component {name: dependency.component})
-    MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
+    MERGE (scd:SubComponent {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (cd)-[:SubComponent]->(scd)
     """
 
