@@ -9,16 +9,17 @@ from scripts.appProps import appType
 from scripts.appProps import convertYamlTojson
 
 
-def draw(graph, options, physics=False):
-    # The options argument should be a dictionary of node labels and property keys; it determines which property
-    # is displayed for the node label. For example, in the movie graph, options = {"Movie": "title", "Person": "name"}.
-    # Omitting a node label from the options dict will leave the node unlabeled in the visualization.
-    # Setting physics = True makes the nodes bounce around when you touch them!
-    query = """
+def draw(graph, options, tab, comp, subcomp=None):
+
+    if(subcomp is not None):
+        var = comp+":"+subcomp
+    else:
+        var = comp
+
+    query_7474 = """
     MATCH (n)
     WITH n, rand() AS random
     ORDER BY random
-    LIMIT {limit}
     OPTIONAL MATCH (n)-[r]->(m)
     RETURN n AS source_node,
            id(n) AS source_id,
@@ -27,7 +28,26 @@ def draw(graph, options, physics=False):
            id(m) AS target_id
     """
 
-    data = graph.run(query,limit=10000)
+    query_8474 = """
+    MATCH p=(n)-[r:ConnectsTo]->(m)
+    WHERE m.name = {var} AND exists(n.name)
+    WITH n, m, r, rand() AS random
+    ORDER BY random
+    RETURN n AS source_node,
+           id(n) AS source_id,
+           r,
+           m AS target_node,
+           id(m) AS target_id
+    """
+
+
+    if(tab == 'ConnToComp' or tab == 'ConnToSubComp'):
+        query = query_8474
+    else:
+        query = query_7474
+
+    data = graph.run(query,var=var)
+    print(data.dump())
 
     nodes = []
     edges = []
@@ -85,10 +105,13 @@ def draw(graph, options, physics=False):
     else:
         return result
 
-def authenticate_and_load_json(compName):
-    authenticate("localhost:7474", "", "")
-    graph = Graph()
-    graph.delete_all()
+def authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,compName):
+    
+    #authenticate("localhost:7474", "", "")
+    graph = Graph(bolt=True, host=neo4j_host, http_port=neo4j_http_port, bolt_port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
+   
+    if(neo4j_http_port == 7474):
+        graph.delete_all()
 
     '''
     yamls = [f for f in glob.glob("services/components/%s.yml" %compName)]
@@ -206,7 +229,8 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
                    'CompCompDepGraph':query_comp_comp_dependency_graph
                    }
     query = graph_query.get(tab)
-    run = graph.run(query, json=doc, subCompName=subCompName, data=data)
+    if(query != None):
+        run = graph.run(query, json=doc, subCompName=subCompName, data=data)
 
     if(tab == 'SubCompDepGraph' and run.dump() is None):
         query = query_subcomp_graph_fallback
@@ -216,6 +240,6 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name","Type":"type"}
     #options = {"Component":"name","SubComponent":"name","Type":"type"}
 
-    result = draw(graph,options,compName)
+    result = draw(graph,options,tab,compName,subCompName)
     return result
 
