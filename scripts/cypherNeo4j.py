@@ -1,12 +1,13 @@
 import glob
 import json
 import yaml
-from py2neo import Graph, authenticate
+from py2neo import Graph
 import os.path
 import datetime
 from scripts.appProps import appImage
 from scripts.appProps import appType
 from scripts.appProps import convertYamlTojson
+from pandas import DataFrame
 
 
 def draw(graph, options, tab, comp, subcomp=None):
@@ -95,6 +96,12 @@ def draw(graph, options, tab, comp, subcomp=None):
         rel = row[2]
         target_node = row[3]
         target_id = row[4]
+        print(row)
+        print(source_node)
+        print(source_id)
+        print(rel)
+        print(target_node)
+        print(target_id)
 
         source_info = get_vis_info(source_node, source_id)
 
@@ -109,6 +116,7 @@ def draw(graph, options, tab, comp, subcomp=None):
             
             edge_id = str(source_info["id"])+"-"+str(target_info["id"])
             edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()})
+            print(rel.type())
 
     result = {'nodes':nodes,'edges':edges}
     #return result
@@ -119,33 +127,51 @@ def draw(graph, options, tab, comp, subcomp=None):
         return result
 
 
-def authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,compName):
+def get_dependency_data(graph,value):
+
+    query_comp = """
+    MATCH (comp:Component)-[:ConnectsTo]->(depcomps:Component)
+    WITH comp, depcomps ORDER BY depcomps.name
+    WITH comp, COLLECT(depcomps.name) AS Dependent_Components, COUNT(depcomps) AS Dep_Count
+    WITH comp ORDER BY comp.name, Dependent_Components, Dep_Count
+    WITH COLLECT(comp.name) AS Components, Dependent_Components, Dep_Count
+    WHERE SIZE(Components) > 1
+    RETURN Components, Dependent_Components
+    ORDER BY Dep_Count
+    """
+    query_subcomp = """
+    MATCH (subcomp:SubComponent)-[:ConnectsTo]->(depsubcomps:SubComponent)
+    WITH subcomp, depsubcomps ORDER BY depsubcomps.name
+    WITH subcomp, COLLECT(depsubcomps.name) AS Dependent_SubComponents, COUNT(depsubcomps) AS Dep_Count
+    WITH subcomp ORDER BY subcomp.name, Dependent_SubComponents, Dep_Count
+    WITH COLLECT(subcomp.name) AS SubComponents, Dependent_SubComponents, Dep_Count
+    WHERE SIZE(SubComponents) > 1
+    RETURN SubComponents, Dependent_SubComponents
+    ORDER BY Dep_Count
+    """
+
+
+    if(value == 'comp'):
+        query = query_comp
+    else:
+        query = query_subcomp
+
+    data =  graph.run(query)
+    df = DataFrame(list(map(dict, data)))
+    print(df)
+    return df
+
+
+def authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass):
     
     #authenticate("localhost:7474", "", "")
-    graph = Graph(bolt=True, host=neo4j_host, http_port=neo4j_http_port, bolt_port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
+    #v3
+    graph = Graph(bolt=False, host=neo4j_host, http_port=neo4j_http_port, bolt_port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
    
     if(neo4j_http_port == 7474):
         graph.delete_all()
 
-    '''
-    yamls = [f for f in glob.glob("services/components/%s.yml" %compName)]
-    
-    for yml in yamls:
-        path = yml.split('.')[0]
-        name = path+".json"
-        fjson = open(name, 'w')
-        with open(yml) as comp:
-            fjson.write(json.dumps(yaml.load(comp), indent=4))
-        fjson.close()
-
-    jsons = [f for f in glob.glob("services/components/%s.json" %compName)]
-
-    for f in jsons:
-        with open(f) as data_file:
-            doc = json.load(data_file)
-    '''
-    doc = convertYamlTojson(compName)
-    return graph,doc
+    return graph
 
 
 def generate_graph(graph,doc,tab,compName,subCompName=None):
