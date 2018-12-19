@@ -28,7 +28,7 @@ def draw(graph, options, tab, comp, subcomp=None):
            id(m) AS target_id
     """
 
-    query_8474 = """
+    query_8474_1 = """
     MATCH p=(n)-[r:ConnectsTo]->(m)
     WHERE m.name = {var} AND exists(n.name)
     WITH n, m, r, rand() AS random
@@ -39,7 +39,19 @@ def draw(graph, options, tab, comp, subcomp=None):
            m AS target_node,
            id(m) AS target_id
     """
-
+   
+    query_8474 = """
+    MATCH (m)
+    WHERE m.name = {var}
+    WITH m, rand() AS random
+    ORDER BY random
+    OPTIONAL MATCH (n)-[r]->(m)
+    RETURN n AS source_node,
+           id(n) AS source_id,
+           r,
+           m AS target_node,
+           id(m) AS target_id
+    """
 
     if(tab == 'ConnToComp' or tab == 'ConnToSubComp'):
         query = query_8474
@@ -47,7 +59,6 @@ def draw(graph, options, tab, comp, subcomp=None):
         query = query_7474
 
     data = graph.run(query,var=var)
-    print(data.dump())
 
     nodes = []
     edges = []
@@ -100,10 +111,13 @@ def draw(graph, options, tab, comp, subcomp=None):
             edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()})
 
     result = {'nodes':nodes,'edges':edges}
+    #return result
+
     if not nodes:
         return None
     else:
         return result
+
 
 def authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,compName):
     
