@@ -95,7 +95,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     WITH {json} AS document
     UNWIND document.subcomponents AS subcomponent
     MERGE (comp:Component {name: document.component})
-    MERGE (subcomp:SubComponent {name: document.component+":"+subcomponent.name})
+    MERGE (subcomp:SubComponent {name: subcomponent.name})
     CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
     """
 
@@ -134,7 +134,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND document.subcomponents AS subcomponent
     UNWIND subcomponent.dependencies AS dependency
     MERGE (comp:Component {name: document.component})
-    MERGE (subcomp:SubComponent {name: document.component+":"+subcomponent.name})
+    MERGE (subcomp:SubComponent {name: subcomponent.name})
     MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
     CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
