@@ -14,6 +14,12 @@ import visdcc
 from scripts import cypherNeo4j
 from scripts.appProps import convertYamlTojson
 import redis
+from scripts.getUpdatedYaml import updateYamls
+from scripts.redisCache import expireCache
+from flask import redirect
+from scripts.time_tracker import TimeTracker
+
+time_tracker = TimeTracker()
 
 
 redis_db = redis.StrictRedis(host="localhost", charset="utf-8", port=6379, db=0, decode_responses=True)
@@ -119,21 +125,31 @@ def get_sample_visdcc():
     return sample_visdcc
 
 
+@time_tracker.time_track()
 def get_graph(comp,tab,subcomp=None):
 
     if(subcomp is not None):
         redis_key = comp+":"+tab+":"+subcomp
     else:
         redis_key = comp+":"+tab
-
-    cache_result = redis_db.get(redis_key)
+    
+    try:
+        cache_result = redis_db.get(redis_key)
+    except Exception as err:
+        print("Can't Read From Redis:",err)
+        cache_result = None
+    
     if(cache_result is not None):
         result = json.loads(cache_result)
     else:
         graph, document = cypherNeo4j.authenticate_and_load_json(comp)
         result = cypherNeo4j.generate_graph(graph,document,tab,comp,subcomp)
         cache_result = json.dumps(result)
-        redis_db.set(redis_key,cache_result)
+  
+        try:
+            redis_db.set(redis_key,cache_result)
+        except Exception as err:
+            print("Can't Write To Redis:",err)
 
     visual = visdcc.Network(id='net',
              options = dict(height= '600px',
@@ -231,6 +247,17 @@ def load_graph_comp(comp,tab):
     if(comp is not None):
         result = get_graph(comp,tab)
         return result
+
+
+@server.route('/update')
+def update():
+    comps = updateYamls()
+    if(comps):
+        expireCache(redis_db,comps)
+        return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+    else:
+        return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+
 
 # start Flask server
 if __name__ == '__main__':
