@@ -19,6 +19,8 @@ from scripts.redisCache import expireCache
 from flask import redirect
 from scripts.time_tracker import TimeTracker
 import logging
+from pandas import DataFrame, Series
+import dumpYamlsNeo4j
 
 
 logfile = "/var/log/dependency-graph/dependency-graph.log"
@@ -59,6 +61,7 @@ def get_tabs():
                 dcc.Tab(label='Comp Comp Dependency', value='CompCompDepGraph'),
                 dcc.Tab(label='ConnectsTo Comp', value='ConnToComp'),
                 dcc.Tab(label='ConnectsTo SubComp', value='ConnToSubComp'),
+                dcc.Tab(label='Graph Data', value='DepTable'),
             ]),
         html.Div(id='tab-output')
         ])
@@ -158,16 +161,21 @@ def get_graph(comp,tab,subcomp=None):
         if(tab == 'ConnToComp' or tab == 'ConnToSubComp'):
             neo4j_http_port = 8474
             neo4j_bolt_port = 8687
-            graph, document = cypherNeo4j.authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,comp)
+            graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
+            document = convertYamlTojson(comp)
         else:
             neo4j_http_port = 7474
             neo4j_bolt_port = 7687
-            graph, document = cypherNeo4j.authenticate_and_load_json(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass,comp)
+            graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
+            document = convertYamlTojson(comp)
+            
 
         result = cypherNeo4j.generate_graph(graph,document,tab,comp,subcomp)
         cache_result = json.dumps(result)
+
+        NoneType = type(None)
             
-        if(cache_result is not None or cache_result != ""):
+        if(not isinstance(result, NoneType)):
             try:
                 redis_db.set(redis_key,cache_result)
             except Exception as err:
@@ -192,6 +200,98 @@ def get_graph(comp,tab,subcomp=None):
              data=result
              )
     return visual
+
+
+def graph_data():
+    display_graph_data = html.Div([
+        html.Div(radio_button(),className="row",style={'textAlign': 'center'}),
+            html.Div(
+                html.Table(id='output-radio-value',style={'margin': '0 auto','width': '100%'}),
+                className='twelve columns'),
+        ])
+    return display_graph_data
+
+def radio_button():
+    get_radio_button = html.Div([
+         html.Br(),
+         dcc.RadioItems(id='radio-value',
+         options=[
+            {'label': 'Component (Common Dependecy)', 'value': 'commDepcomp'},
+            {'label': 'SubComponent (Common Dependency)', 'value': 'commDepsubcomp'},
+            {'label': 'Circular Dependency', 'value': 'cirDepsubcomp'},
+            {'label': 'StandAlone SubComponents', 'value': 'stndAlonesubcomp'},
+         ],
+         value='commDepsubcomp',
+         labelStyle={'margin': '0px 20px','display': 'inline-block'}
+         )
+         ])
+    return get_radio_button
+
+def generate_table(dataframe,value):
+
+    '''Given dataframe, return template generated using Dash components'''
+    if(dataframe.size == 0):
+        return no_results()
+    else:
+        num = dataframe.shape[0]
+        s_no = list(range(1, num+1))
+        dataframe.insert(loc=0, column='S.No.', value=s_no)
+
+        columnsNames = list(dataframe.columns.values)
+
+
+        if(value == 'commDepcomp'):
+            columnsTitles = ['S.No.','Components','Dependent_Components']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            dataframe.rename(columns={'S.No.':'S.No.', 'Components':'Components', 'Dependent_Components':'Component Dependency'}, inplace=True)
+        elif(value == 'commDepsubcomp'):
+            columnsTitles = ['S.No.','SubComponents','Dependent_SubComponents']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            dataframe.rename(columns={'S.No.':'S.No.', 'SubComponents':'SubComponents', 'Dependent_SubComponents':'SubComponent Dependency'}, inplace=True)
+        elif(value == 'cirDepsubcomp'):
+            columnsTitles = ['S.No.','Components','SubComponents']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            #dataframe.rename(columns={'S.No.':'S.No.', 'Components':'Components', 'SubComponents':'SubComponents'}, inplace=True)
+        elif(value == 'stndAlonesubcomp'):
+            columnsTitles = ['S.No.','Components','SubComponents']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            #dataframe.rename(columns={'S.No.':'S.No.', 'Components':'Components', 'SubComponents':'SubComponents'}, inplace=True)
+        else:
+            return None
+        '''
+        if('SubComponents' in columnsNames):
+            columnsTitles = ['S.No.','SubComponents','Dependent_SubComponents']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            dataframe.rename(columns={'S.No.':'S.No.', 'SubComponents':'SubComponents', 'Dependent_SubComponents':'SubComponent Dependency'}, inplace=True)
+        else:
+            columnsTitles = ['S.No.','Components','Dependent_Components']
+            dataframe = dataframe.reindex(columns=columnsTitles)
+            dataframe.rename(columns={'S.No.':'S.No.', 'Components':'Components', 'Dependent_Components':'Component Dependency'}, inplace=True)
+        '''
+       
+        rows = []
+        for i in range(len(dataframe)):
+            row = []
+            for col in dataframe.columns:
+                value = dataframe.iloc[i][col]
+                new_value = str(value)
+                cell = html.Td(children=new_value)
+                row.append(cell)
+            rows.append(html.Tr(row))
+
+        return html.Table(
+            # Header
+            [html.Tr([html.Th(col) for col in dataframe.columns])] + rows,className='responstable'
+            )
+
+def no_results():
+        # Page Header
+    result = html.Div([
+        html.Br(),
+        html.Br(),
+        html.H4('No Results Found',style={'textAlign': 'center'})
+    ])
+    return result
 
 
 #########################
@@ -236,6 +336,8 @@ def display_content(tab):
         return display_comp()
     elif tab == 'ConnToSubComp':
         return display_comp_subcomp()
+    elif tab == 'DepTable':
+        return graph_data()
     else:
         return None
 
@@ -275,15 +377,30 @@ def load_graph_comp(comp,tab):
         return result
 
 
+#Groupping Common Dependency
+@app.callback(
+    dash.dependencies.Output('output-radio-value', 'children'),
+    [dash.dependencies.Input('radio-value', 'value')])
+def comp_subcomp_dep_table(value):
+    neo4j_http_port = 8474
+    neo4j_bolt_port = 8687
+    graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
+    result,rvalue = cypherNeo4j.get_graph_data(graph,value)
+    return generate_table(result,rvalue)
+
+
 @server.route('/update')
 def update():
     comps = updateYamls()
     if(comps):
-        expireCache(redis_db,comps)
-        return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+        try:
+            expireCache(redis_db,comps)
+            dumpYamlsNeo4j.dump()
+            return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+        except Exception as err:
+            return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
     else:
         return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
-
 
 # start Flask server
 if __name__ == '__main__':
