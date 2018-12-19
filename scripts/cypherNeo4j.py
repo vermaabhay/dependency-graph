@@ -4,28 +4,9 @@ import yaml
 from py2neo import Graph, authenticate
 import os.path
 import datetime
-
-
-def appImage(app_type):
-    image_dict = {'nodejs': '/assets/imgs/nodejs.png', 'redis': '/assets/imgs/redis.png', 'cdn': '/assets/imgs/cdn.png', 'zookeeper': '/assets/imgs/zookeeper.png', 'kibana': '/assets/imgs/kibana.png', 'kafka': '/assets/imgs/kafka.png', 'mysql': '/assets/imgs/mysql.png', 'hbase': '/assets/imgs/hbase.jpg', 'mailserver': '/assets/imgs/mailserver.png', 'cassandra': '/assets/imgs/cassandra.png', 'ftp': '/assets/imgs/ftp.jpg', 'php': '/assets/imgs/php.svg', 's3': '/assets/imgs/s3.png', 'solr': '/assets/imgs/solr.png', 'jar': '/assets/imgs/jar.png', 'jetty': '/assets/imgs/jetty.png', 'vertica': '/assets/imgs/vertica.jpg', 'storm': '/assets/imgs/storm.png', 'ldap': '/assets/imgs/ldap.svg', 'ruby': '/assets/imgs/ruby.png', 'graphite': '/assets/imgs/graphite.png', 'riak': '/assets/imgs/riak.png', 'aerospikecache': '/assets/imgs/aerospikecache.png', 'hdfs': '/assets/imgs/hdfs.png', 'python': '/assets/imgs/python.png', 'mongodb': '/assets/imgs/mongodb.png', 'lighttpd': '/assets/imgs/lighttpd.png', 'influxdb': '/assets/imgs/influxdb.png', 'nginx': '/assets/imgs/nginx.png', 'apache': '/assets/imgs/apache.png', 'spark': '/assets/imgs/spark.png', 'kong': '/assets/imgs/kong.png', 'activemq': '/assets/imgs/activemq.png', 'salesforce': '/assets/imgs/salesforce.png', 'aerospike': '/assets/imgs/aerospike.png', 'tomcat': '/assets/imgs/tomcat.png', 'default': '/assets/imgs/default.ico', 'rabbitmq': '/assets/imgs/rabbitmq.png', 'elasticsearch': '/assets/imgs/elasticsearch.png', 'hadoop': '/assets/imgs/hadoop.png', 'apk': '/assets/imgs/apk.png', 'chefserver': '/assets/imgs/chefserver.png', 'consul': '/assets/imgs/consul.png', 'docker': '/assets/imgs/docker.png', 'ejabberd': '/assets/imgs/ejabberd.png', 'external': '/assets/imgs/external.png', 'gerrit': '/assets/imgs/gerrit.png', 'jenkinsmaster': '/assets/imgs/jenkins.png', 'jenkinsslave': '/assets/imgs/jenkins.png', 'jumpserver': '/assets/imgs/jumpserver.png', 'loadbalancer': '/assets/imgs/loadbalancer.png', 'memcache': '/assets/imgs/memcache.png', 'nfs': '/assets/imgs/nfs.png', 'orchestrator': '/assets/imgs/orchestrator.png', 'ror': '/assets/imgs/ror.png', 'saltmaster': '/assets/imgs/saltmaster.png', 'services': '/assets/imgs/services.png', 'staticfiles': '/assets/imgs/staticfiles.png', 'superset': '/assets/imgs/superset.png', 'tdagent': '/assets/imgs/tdagent.png', 'telegraf': '/assets/imgs/telegraf.png', 'vault': '/assets/imgs/vault.png'
-}
-    default = "https://www.snapdeal.com/img/icons/finalFavicon.ico"
-    image_url = image_dict.get(app_type, default)
-    return image_url
-
-
-def get_appType(vis_label):
-
-    compName = vis_label.split(':')[0]
-    subCompName = vis_label.split(':')[1]
-  
-    doc = convertYamlTojson(compName)
-    subcomps = doc['subcomponents']
-  
-    for subcomp in subcomps:
-        if(subcomp['name'] == subCompName):
-            subcomp_type = subcomp['type']
-            return subcomp_type
+from scripts.appProps import appImage
+from scripts.appProps import appType
+from scripts.appProps import convertYamlTojson
 
 
 def draw(graph, options, physics=False):
@@ -72,7 +53,7 @@ def draw(graph, options, physics=False):
             if(node_label == "Component" or node_label == "ComponentDependency"):
                 image_url = appImage('default')
             else:
-                scdType = get_appType(vis_label)
+                scdType = appType(vis_label)
                 image_url = appImage(scdType)
             return {"id": id, "label": vis_label, "group": node_label, "shape":"image", "image":image_url}
 
@@ -99,26 +80,10 @@ def draw(graph, options, physics=False):
             edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()})
 
     result = {'nodes':nodes,'edges':edges}
-    return result
-
-def convertYamlTojson(compName):
-    yaml_file = glob.glob("services/components/%s.yml" %compName)[0]
-    path = yaml_file.split('.')[0]
-    name = path+".json"
-    if os.path.isfile(name):
-        json_file = glob.glob("services/components/%s.json" %compName)[0]
+    if not nodes:
+        return None
     else:
-        fjson = open(name, 'w')
-        with open(yaml_file) as comp:
-            fjson.write(json.dumps(yaml.load(comp), indent=4))
-        fjson.close()
-        json_file = glob.glob("services/components/%s.json" %compName)[0]
- 
-    with open(json_file) as data_file:
-        doc = json.load(data_file)
-
-    return doc
-    
+        return result
 
 def authenticate_and_load_json(compName):
     authenticate("localhost:7474", "", "")
@@ -188,6 +153,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
     """
 
+
     #match (comp:Component)
     #return comp
     #match (subcomps:SubComponents)
@@ -240,13 +206,11 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
                    'CompCompDepGraph':query_comp_comp_dependency_graph
                    }
     query = graph_query.get(tab)
-    out = graph.run(query, json=doc, subCompName=subCompName)
-   
-    if(tab == 'SubCompDepGraph' and out.dump() is None):
+    run = graph.run(query, json=doc, subCompName=subCompName, data=data)
+
+    if(tab == 'SubCompDepGraph' and run.dump() is None):
         query = query_subcomp_graph_fallback
-        out = graph.run(query, json=doc, subCompName=subCompName)
-
-
+        graph.run(query, json=doc, subCompName=subCompName, data=data)
     ###########
 
     options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name","Type":"type"}
