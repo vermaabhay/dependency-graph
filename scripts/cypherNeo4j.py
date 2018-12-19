@@ -2,6 +2,31 @@ import glob
 import json
 import yaml
 from py2neo import Graph, authenticate
+import os.path
+import datetime
+
+
+def appImage(app_type):
+    image_dict = {'nodejs': '/assets/imgs/nodejs.png', 'redis': '/assets/imgs/redis.png', 'cdn': '/assets/imgs/cdn.png', 'zookeeper': '/assets/imgs/zookeeper.png', 'kibana': '/assets/imgs/kibana.png', 'kafka': '/assets/imgs/kafka.png', 'mysql': '/assets/imgs/mysql.png', 'hbase': '/assets/imgs/hbase.jpg', 'mailserver': '/assets/imgs/mailserver.png', 'cassandra': '/assets/imgs/cassandra.png', 'ftp': '/assets/imgs/ftp.jpg', 'php': '/assets/imgs/php.svg', 's3': '/assets/imgs/s3.png', 'solr': '/assets/imgs/solr.png', 'jar': '/assets/imgs/jar.png', 'jetty': '/assets/imgs/jetty.png', 'vertica': '/assets/imgs/vertica.jpg', 'storm': '/assets/imgs/storm.png', 'ldap': '/assets/imgs/ldap.svg', 'ruby': '/assets/imgs/ruby.png', 'graphite': '/assets/imgs/graphite.png', 'riak': '/assets/imgs/riak.png', 'aerospikecache': '/assets/imgs/aerospikecache.png', 'hdfs': '/assets/imgs/hdfs.png', 'python': '/assets/imgs/python.png', 'mongodb': '/assets/imgs/mongodb.png', 'lighttpd': '/assets/imgs/lighttpd.png', 'influxdb': '/assets/imgs/influxdb.png', 'nginx': '/assets/imgs/nginx.png', 'apache': '/assets/imgs/apache.png', 'spark': '/assets/imgs/spark.png', 'kong': '/assets/imgs/kong.png', 'activemq': '/assets/imgs/activemq.png', 'salesforce': '/assets/imgs/salesforce.png', 'aerospike': '/assets/imgs/aerospike.png', 'tomcat': '/assets/imgs/tomcat.png', 'default': '/assets/imgs/default.ico', 'rabbitmq': '/assets/imgs/rabbitmq.png', 'elasticsearch': '/assets/imgs/elasticsearch.png', 'hadoop': '/assets/imgs/hadoop.png', 'apk': '/assets/imgs/apk.png', 'chefserver': '/assets/imgs/chefserver.png', 'consul': '/assets/imgs/consul.png', 'docker': '/assets/imgs/docker.png', 'ejabberd': '/assets/imgs/ejabberd.png', 'external': '/assets/imgs/external.png', 'gerrit': '/assets/imgs/gerrit.png', 'jenkinsmaster': '/assets/imgs/jenkins.png', 'jenkinsslave': '/assets/imgs/jenkins.png', 'jumpserver': '/assets/imgs/jumpserver.png', 'loadbalancer': '/assets/imgs/loadbalancer.png', 'memcache': '/assets/imgs/memcache.png', 'nfs': '/assets/imgs/nfs.png', 'orchestrator': '/assets/imgs/orchestrator.png', 'ror': '/assets/imgs/ror.png', 'saltmaster': '/assets/imgs/saltmaster.png', 'services': '/assets/imgs/services.png', 'staticfiles': '/assets/imgs/staticfiles.png', 'superset': '/assets/imgs/superset.png', 'tdagent': '/assets/imgs/tdagent.png', 'telegraf': '/assets/imgs/telegraf.png', 'vault': '/assets/imgs/vault.png'
+}
+    default = "https://www.snapdeal.com/img/icons/finalFavicon.ico"
+    image_url = image_dict.get(app_type, default)
+    return image_url
+
+
+def get_appType(vis_label):
+
+    compName = vis_label.split(':')[0]
+    subCompName = vis_label.split(':')[1]
+  
+    doc = convertYamlTojson(compName)
+    subcomps = doc['subcomponents']
+  
+    for subcomp in subcomps:
+        if(subcomp['name'] == subCompName):
+            subcomp_type = subcomp['type']
+            return subcomp_type
+
 
 def draw(graph, options, physics=False):
     # The options argument should be a dictionary of node labels and property keys; it determines which property
@@ -26,12 +51,31 @@ def draw(graph, options, physics=False):
     nodes = []
     edges = []
 
-    def get_vis_info(node, id):
-        node_label = list(node.labels())[0]
-        prop_key = options.get(node_label)
-        vis_label = node.properties.get(prop_key, "")
 
-        return {"id": id, "label": vis_label, "group": node_label}
+    def get_vis_info(node, id):
+        node_labels = list(node.labels())
+        if(len(node_labels) > 1):
+            for node_label in node_labels:
+                if(node_label == "SubComponent"):
+                    group = node_label
+                    prop_key = options.get(node_label)
+                    vis_label = node.properties.get(prop_key, "")
+                if(node_label == "Type"):
+                    prop_key = options.get(node_label)
+                    app_type = node.properties.get(prop_key, "")
+                    image_url = appImage(app_type)
+            return {"id": id, "label": vis_label, "group": group, "shape":"image", "image":image_url}
+        else:
+            node_label = list(node.labels())[0]
+            prop_key = options.get(node_label)
+            vis_label = node.properties.get(prop_key, "")
+            if(node_label == "Component" or node_label == "ComponentDependency"):
+                image_url = appImage('default')
+            else:
+                scdType = get_appType(vis_label)
+                image_url = appImage(scdType)
+            return {"id": id, "label": vis_label, "group": node_label, "shape":"image", "image":image_url}
+
 
     for row in data:
         source_node = row[0]
@@ -55,14 +99,33 @@ def draw(graph, options, physics=False):
             edges.append({"id": edge_id, "from": source_info["id"], "to": target_info["id"], "label": rel.type()})
 
     result = {'nodes':nodes,'edges':edges}
-    #print(result)
     return result
+
+def convertYamlTojson(compName):
+    yaml_file = glob.glob("services/components/%s.yml" %compName)[0]
+    path = yaml_file.split('.')[0]
+    name = path+".json"
+    if os.path.isfile(name):
+        json_file = glob.glob("services/components/%s.json" %compName)[0]
+    else:
+        fjson = open(name, 'w')
+        with open(yaml_file) as comp:
+            fjson.write(json.dumps(yaml.load(comp), indent=4))
+        fjson.close()
+        json_file = glob.glob("services/components/%s.json" %compName)[0]
+ 
+    with open(json_file) as data_file:
+        doc = json.load(data_file)
+
+    return doc
+    
 
 def authenticate_and_load_json(compName):
     authenticate("localhost:7474", "", "")
     graph = Graph()
     graph.delete_all()
 
+    '''
     yamls = [f for f in glob.glob("services/components/%s.yml" %compName)]
     
     for yml in yamls:
@@ -78,6 +141,8 @@ def authenticate_and_load_json(compName):
     for f in jsons:
         with open(f) as data_file:
             doc = json.load(data_file)
+    '''
+    doc = convertYamlTojson(compName)
     return graph,doc
 
 
@@ -95,7 +160,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     WITH {json} AS document
     UNWIND document.subcomponents AS subcomponent
     MERGE (comp:Component {name: document.component})
-    MERGE (subcomp:SubComponent {name: subcomponent.name})
+    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
     CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
     """
 
@@ -110,9 +175,17 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND subcomponent.dependencies AS dependency
     WITH document,subcomponent,dependency
     WHERE subcomponent.name = {subCompName}
-    MERGE (subcomp:SubComponent {name: document.component+":"+subcomponent.name})
+    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
     MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
+    """
+
+    query_subcomp_graph_fallback = """
+    WITH {json} AS document
+    UNWIND document.subcomponents AS subcomponent
+    WITH subcomponent
+    WHERE subcomponent.name = {subCompName}
+    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
     """
 
     #match (comp:Component)
@@ -134,7 +207,7 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
     UNWIND document.subcomponents AS subcomponent
     UNWIND subcomponent.dependencies AS dependency
     MERGE (comp:Component {name: document.component})
-    MERGE (subcomp:SubComponent {name: subcomponent.name})
+    MERGE (subcomp:SubComponent:Type {name: subcomponent.name, type:subcomponent.type})
     MERGE (scd:SubComponentDependency {name: dependency.component+":"+dependency.subcomponent})
     CREATE UNIQUE (comp)-[:SubComponent]->(subcomp)
     CREATE UNIQUE (subcomp)-[:ConnectsTo]->(scd)
@@ -167,12 +240,17 @@ def generate_graph(graph,doc,tab,compName,subCompName=None):
                    'CompCompDepGraph':query_comp_comp_dependency_graph
                    }
     query = graph_query.get(tab)
-    graph.run(query, json=doc, subCompName=subCompName, data=data)
+    out = graph.run(query, json=doc, subCompName=subCompName)
+   
+    if(tab == 'SubCompDepGraph' and out.dump() is None):
+        query = query_subcomp_graph_fallback
+        out = graph.run(query, json=doc, subCompName=subCompName)
 
 
     ###########
 
-    options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name"}
+    options = {"Component":"name","SubComponent":"name","ComponentDependency":"name","SubComponentDependency":"name","Type":"type"}
+    #options = {"Component":"name","SubComponent":"name","Type":"type"}
 
     result = draw(graph,options,compName)
     return result
