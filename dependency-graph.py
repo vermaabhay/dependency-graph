@@ -394,6 +394,7 @@ def update():
     comps = updateYamls()
     if(comps):
         try:
+            comps.extend(['ConnToComp','ConnToSubComp'])
             expireCache(redis_db,comps)
             dumpYamlsNeo4j.dump()
             return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
