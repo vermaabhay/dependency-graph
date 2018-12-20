@@ -12,7 +12,7 @@ neo4j_user = ""
 neo4j_pass = ""
 
 
-def dump():
+def dumpAllYamlsNeo4j():
 
     graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
     graph.delete_all()

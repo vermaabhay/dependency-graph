@@ -2,14 +2,16 @@ import json
 from urllib.request import Request, urlopen
 import base64
 import re
-from scripts.appProps import convertYamlTojson
 import os
+from scripts.appProps import convertYamlTojson
 
 base_url = 'http://gitlab.snapdeal.com'
 api_url = '%s/api/v3' % base_url
-token = ''
+token = 'hSY4QJ2myqoh96BKPY8i'
 project_id = 1346
 project_path = 'devtools/services'
+path = 'components'
+per_page = -1
 
 
 def get_last_commit_id():
@@ -42,26 +44,29 @@ def get_diff_on_commit_ids():
         prev_commit_id = last_commit_id
         file_name.close()
         
-    url = "{0}/projects/{1}/repository/compare?from={2}&to={3}".format(api_url,project_id,prev_commit_id,last_commit_id)
-    query = Request(url)
-    query.add_header('PRIVATE-TOKEN', token)
-    result = urlopen(query).read()
-    result = json.loads(result)
-    files = []
-    diffs = result.get('diffs')
-    for diff in diffs:
-        diff_str_all = diff.get('diff')
-        diff_str_match = re.findall('^[+-].*', diff_str_all, re.MULTILINE)
-        diff_str = ''.join(diff_str_match)
-        if(re.search(r'(^{0})'.format(comp_dep),diff_str) or re.search(r'(^{0})'.format(subcomp_dep),diff_str) or re.search(r'(^{0})'.format(name),diff_str)):
-            files.append(diff.get('new_path'))
-    for f in files:
-        get_updated_file(f)
+    if(prev_commit_id != last_commit_id):
+        url = "{0}/projects/{1}/repository/compare?from={2}&to={3}".format(api_url,project_id,prev_commit_id,last_commit_id)
+        query = Request(url)
+        query.add_header('PRIVATE-TOKEN', token)
+        result = urlopen(query).read()
+        result = json.loads(result)
+        files = []
+        diffs = result.get('diffs')
+        for diff in diffs:
+            diff_str_all = diff.get('diff')
+            diff_str_match = re.findall('^[+-].*', diff_str_all, re.MULTILINE)
+            diff_str = ''.join(diff_str_match)
+            if(re.search(r'(^{0})'.format(comp_dep),diff_str) or re.search(r'(^{0})'.format(subcomp_dep),diff_str) or re.search(r'(^{0})'.format(name),diff_str)):
+                files.append(diff.get('new_path'))
+        for f in files:
+            get_updated_file(f)
 
-    file_name = open('services/components/prev_commit_id.txt','w')
-    file_name.write(last_commit_id)
-    file_name.close()
-    return files
+        file_name = open('services/components/prev_commit_id.txt','w')
+        file_name.write(last_commit_id)
+        file_name.close()
+        return files
+    else:
+        return None
     
 
 def get_updated_file(file_name):
@@ -80,11 +85,33 @@ def get_updated_file(file_name):
 def updateYamls():
     
     files = get_diff_on_commit_ids()
-    print("Updated following YAMLs:")
-    print(files)
-    comps = []
-    for f in files:
-        comp = f.split('/')[1].split('.')[0]
-        comps.append(comp)
-        convertYamlTojson(comp,convert=True)
-    return comps
+    if(files):
+        print("Updated following YAMLs:")
+        print(files)
+        comps = []
+        for f in files:
+            comp = f.split('/')[1].split('.')[0]
+            comps.append(comp)
+            convertYamlTojson(comp,convert=True)
+        return comps
+    else:
+        return None
+
+
+def setUpAllYamls():
+    if(os.path.exists('services/components')) is False:
+        os.makedirs('services/components')
+        url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,path,per_page)
+        query = Request(url)
+        query.add_header('PRIVATE-TOKEN', token)
+        result = urlopen(query).read()
+        result = json.loads(result)
+        files = ["components/"+comp.get('name') for comp in result]
+        for f in files:
+            get_updated_file(f)
+            comp = f.split('/')[1].split('.')[0]
+            convertYamlTojson(comp,convert=True)
+        get_diff_on_commit_ids()
+        return True
+    else:
+        return None

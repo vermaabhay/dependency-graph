@@ -20,7 +20,7 @@ from flask import redirect
 from scripts.time_tracker import TimeTracker
 import logging
 from pandas import DataFrame, Series
-import dumpYamlsNeo4j
+from scripts.allInfraInNeo4j import dumpAllYamlsNeo4j
 
 
 logfile = "/var/log/dependency-graph/dependency-graph.log"
@@ -396,12 +396,12 @@ def update():
         try:
             comps.extend(['ConnToComp','ConnToSubComp'])
             expireCache(redis_db,comps)
-            dumpYamlsNeo4j.dump()
-            return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+            dumpAllYamlsNeo4j()
+            return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
         except Exception as err:
-            return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+            return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
     else:
-        return redirect("http://dependency-graph.ops.snapdeal.io", code=302)
+        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
 
 # start Flask server
 if __name__ == '__main__':
