@@ -403,6 +403,16 @@ def update():
     else:
         return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
 
+@server.route('/initialsetup')
+def setup():
+    try:
+        setUpAllYamls()
+        dumpAllYamlsNeo4j()
+        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+    except Exception as err:
+        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+
+
 # start Flask server
 if __name__ == '__main__':
     app.run_server(debug=False)
