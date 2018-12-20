@@ -7,7 +7,7 @@ from scripts.appProps import convertYamlTojson
 
 base_url = 'http://gitlab.snapdeal.com'
 api_url = '%s/api/v3' % base_url
-token = 'hSY4QJ2myqoh96BKPY8i'
+token = ''
 project_id = 1346
 project_path = 'devtools/services'
 path = 'components'
