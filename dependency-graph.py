@@ -14,9 +14,9 @@ import visdcc
 from scripts import cypherNeo4j
 from scripts.appProps import convertYamlTojson
 import redis
-from scripts.getUpdatedYaml import updateYamls
+from scripts.getUpdatedYaml import updateYamls, setUpAllYamls
 from scripts.redisCache import expireCache
-from flask import redirect
+from flask import redirect, request
 from scripts.time_tracker import TimeTracker
 import logging
 from pandas import DataFrame, Series
@@ -42,8 +42,6 @@ neo4j_pass = ""
 # Data Manipulation / Model
 ###########################
 
-'''Returns the list of component names'''
-comps = [os.path.basename(f).split('.')[0] for f in glob.glob("services/components/*.yml")]
 
 def get_header():
         # Page Header
@@ -68,7 +66,10 @@ def get_tabs():
     return get_tabs
 
 def get_comps():
-
+    comps = []
+    '''Returns the list of component names'''
+    if(os.path.exists('services/components')) is True:
+        comps = [os.path.basename(f).split('.')[0] for f in glob.glob("services/components/*.yml")]
     return comps
    
 
@@ -391,27 +392,31 @@ def comp_subcomp_dep_table(value):
 
 @server.route('/update')
 def update():
-    comps = updateYamls()
-    if(comps):
+    url = request.url
+    new_url = url.replace('/update','')
+    updated_comps = updateYamls()
+    if(updated_comps):
         try:
-            comps.extend(['ConnToComp','ConnToSubComp'])
-            expireCache(redis_db,comps)
+            updated_comps.extend(['ConnToComp','ConnToSubComp'])
+            expireCache(redis_db,updated_comps)
             dumpAllYamlsNeo4j()
-            return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+            return redirect(new_url, code=302)
         except Exception as err:
-            return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+            return redirect(new_url, code=302)
     else:
-        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+        return redirect(new_url, code=302)
+
 
 @server.route('/initialsetup')
 def setup():
+    url = request.url
+    new_url = url.replace('/initialsetup','')
     try:
         setUpAllYamls()
         dumpAllYamlsNeo4j()
-        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
+        return redirect(new_url, code=302)
     except Exception as err:
-        return redirect("https://dependency-graph.ops.snapdeal.io", code=302)
-
+        return redirect(new_url, code=302)
 
 # start Flask server
 if __name__ == '__main__':
