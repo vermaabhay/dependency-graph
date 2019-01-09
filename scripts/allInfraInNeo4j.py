@@ -5,14 +5,8 @@ from py2neo import Graph
 from scripts.appProps import convertYamlTojson
 from scripts import cypherNeo4j
 
-neo4j_host = "localhost"
-neo4j_http_port = 8474
-neo4j_bolt_port = 8687
-neo4j_user = ""
-neo4j_pass = ""
 
-
-def dumpAllYamlsNeo4j():
+def dumpAllYamlsNeo4j(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass):
 
     graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
     graph.delete_all()

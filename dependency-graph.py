@@ -21,21 +21,37 @@ from scripts.time_tracker import TimeTracker
 import logging
 from pandas import DataFrame, Series
 from scripts.allInfraInNeo4j import dumpAllYamlsNeo4j
+import configparser
+
+
+confparser = configparser.RawConfigParser()
+confparser.read('scripts/config.properties')
+
+redis_host = confparser.get('redis','redis_host')
+redis_port = confparser.getint('redis','redis_port')
+
+
+def load_neo4j_config(config_section):
+
+    confparser = configparser.RawConfigParser()
+    confparser.read('scripts/config.properties')
+
+    neo4j_host = confparser.get(config_section,'neo4j_host')
+    neo4j_http_port = confparser.getint(config_section,'neo4j_http_port')
+    neo4j_bolt_port = confparser.getint(config_section,'neo4j_bolt_port')
+    neo4j_user = confparser.get(config_section,'neo4j_user')
+    neo4j_pass = confparser.get(config_section,'neo4j_pass')
+
+    return neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass
 
 
 logfile = "/var/log/dependency-graph/dependency-graph.log"
 logging.basicConfig(filename=logfile, level=logging.INFO, format='%(asctime)s  [%(levelname)s]  %(message)s')
 
-
 time_tracker = TimeTracker()
 
-redis_db = redis.StrictRedis(host="localhost", charset="utf-8", port=6379, db=0, decode_responses=True)
 
-neo4j_host = "localhost"
-#neo4j_http_port = 7474
-#neo4j_bolt_port = 7687
-neo4j_user = ""
-neo4j_pass = ""
+redis_db = redis.StrictRedis(host=redis_host, charset="utf-8", port=redis_port, db=0, decode_responses=True)
 
 
 ###########################
@@ -160,14 +176,13 @@ def get_graph(comp,tab,subcomp=None):
         result = json.loads(cache_result)
     else:
         if(tab == 'ConnToComp' or tab == 'ConnToSubComp'):
-            neo4j_http_port = 8474
-            neo4j_bolt_port = 8687
+            neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-overall-infra')
             graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
             document = convertYamlTojson(comp)
         else:
-            neo4j_http_port = 7474
-            neo4j_bolt_port = 7687
+            neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-on-demand')
             graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
+            graph.delete_all()
             document = convertYamlTojson(comp)
             
 
@@ -200,6 +215,7 @@ def get_graph(comp,tab,subcomp=None):
              ),
              data=result
              )
+    #print("Result",result)
     return visual
 
 
@@ -383,8 +399,7 @@ def load_graph_comp(comp,tab):
     dash.dependencies.Output('output-radio-value', 'children'),
     [dash.dependencies.Input('radio-value', 'value')])
 def comp_subcomp_dep_table(value):
-    neo4j_http_port = 8474
-    neo4j_bolt_port = 8687
+    neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-overall-infra')
     graph = cypherNeo4j.authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
     result,rvalue = cypherNeo4j.get_graph_data(graph,value)
     return generate_table(result,rvalue)
@@ -399,7 +414,8 @@ def update():
         try:
             updated_comps.extend(['ConnToComp','ConnToSubComp'])
             expireCache(redis_db,updated_comps)
-            dumpAllYamlsNeo4j()
+            neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-overall-infra')
+            dumpAllYamlsNeo4j(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
             return redirect(new_url, code=302)
         except Exception as err:
             return redirect(new_url, code=302)
@@ -413,7 +429,8 @@ def setup():
     new_url = url.replace('/initialsetup','')
     try:
         setUpAllYamls()
-        dumpAllYamlsNeo4j()
+        neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-overall-infra')
+        dumpAllYamlsNeo4j(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
         return redirect(new_url, code=302)
     except Exception as err:
         return redirect(new_url, code=302)

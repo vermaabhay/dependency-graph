@@ -206,10 +206,6 @@ def authenticate(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pas
     #v4
     graph = Graph(host=neo4j_host, port=neo4j_bolt_port, user=neo4j_user, password=neo4j_pass)
     
-    
-   
-    if(neo4j_http_port == 7474):
-        graph.delete_all()
 
     return graph
 

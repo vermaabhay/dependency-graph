@@ -4,10 +4,15 @@ import base64
 import re
 import os
 from scripts.appProps import convertYamlTojson
+import configparser
+
+confparser = configparser.RawConfigParser()
+confparser.read('scripts/config.properties')
+
 
 base_url = 'http://gitlab.snapdeal.com'
 api_url = '%s/api/v3' % base_url
-token = ''
+token = confparser.get('gitlab','token')
 project_id = 1346
 project_path = 'devtools/services'
 path = 'components'
