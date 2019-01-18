@@ -12,7 +12,7 @@ confparser.read('scripts/config.properties')
 
 
 base_url = 'http://gitlab.snapdeal.com'
-api_url = '%s/api/v3' % base_url
+api_url = '%s/api/v4' % base_url
 token = confparser.get('gitlab','token')
 project_id = 1346
 project_path = 'devtools/services'
