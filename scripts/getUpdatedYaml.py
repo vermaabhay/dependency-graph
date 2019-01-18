@@ -1,4 +1,5 @@
 import json
+import urllib
 from urllib.request import Request, urlopen
 import base64
 import re
@@ -76,7 +77,9 @@ def get_diff_on_commit_ids():
 
 def get_updated_file(file_name):
         file_path = "services/"+file_name
-        url = "{0}/projects/{1}/repository/files?file_path={2}&ref=master".format(api_url,project_id,file_name)
+        #url = "{0}/projects/{1}/repository/files?file_path={2}&ref=master".format(api_url,project_id,file_name)
+        encoded_file_name = urllib.parse.quote_plus(file_name)
+        url = "{0}/projects/{1}/repository/files/{2}?ref=master".format(api_url,project_id,encoded_file_name)
         query = Request(url)
         query.add_header('PRIVATE-TOKEN', token)
         result = urlopen(query).read()
@@ -106,13 +109,28 @@ def updateYamls():
 def setUpAllYamls():
     if(os.path.exists('services/components')) is False:
         os.makedirs('services/components')
-        url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,path,per_page)
-        query = Request(url)
-        query.add_header('PRIVATE-TOKEN', token)
-        result = urlopen(query).read()
-        result = json.loads(result)
-        files = ["components/"+comp.get('name') for comp in result]
-        for f in files:
+	
+	counter = 1
+
+	while(counter != 0):
+            page = counter
+            per_page = 100
+            #url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,path,per_page)
+            url = "{0}/projects/{1}/repository/tree?path={2}&page={3}&per_page={4}".format(api_url,project_id,path,counter,per_page)
+            query = Request(url)
+            query.add_header('PRIVATE-TOKEN', token)
+            result = urlopen(query).read()
+            result = json.loads(result)
+            files = ["components/"+comp.get('name') for comp in result]
+
+            all_files = all_files.extend(files)
+            
+            if(len(files) < 100):
+                counter = 0
+            else:
+                counter = counter + 1
+
+        for f in all_files:
             get_updated_file(f)
             comp = f.split('/')[1].split('.')[0]
             convertYamlTojson(comp,convert=True)
