@@ -100,10 +100,10 @@ def updateYamls():
     if(files):
         print("Updating following YAMLs:")
         print(files)
-	comps = list(map(lambda f:f.split('/')[2].split('.')[0], files))
+        comps = list(map(lambda f:f.split('/')[2].split('.')[0], files))
 
 	###### Partial Function : As Map In ProcessPoolExecutor Takes Single Argument Functions ######
-	convertYamlTojsonPartial = partial(convertYamlTojson,convert=True)
+        convertYamlTojsonPartial = partial(convertYamlTojson,convert=True)
 
         with ProcessPoolExecutor() as executor:
             executor.map(convertYamlTojsonPartial, comps)
