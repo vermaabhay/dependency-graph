@@ -6,6 +6,10 @@ import re
 import os
 from scripts.appProps import convertYamlTojson
 import configparser
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+
 
 confparser = configparser.RawConfigParser()
 confparser.read('scripts/config.properties')
@@ -94,13 +98,16 @@ def updateYamls():
     
     files = get_diff_on_commit_ids()
     if(files):
-        print("Updated following YAMLs:")
+        print("Updating following YAMLs:")
         print(files)
-        comps = []
-        for f in files:
-            comp = f.split('/')[1].split('.')[0]
-            comps.append(comp)
-            convertYamlTojson(comp,convert=True)
+	comps = list(map(lambda f:f.split('/')[2].split('.')[0], files))
+
+	###### Partial Function : As Map In ProcessPoolExecutor Takes Single Argument Functions ######
+	convertYamlTojsonPartial = partial(convertYamlTojson,convert=True)
+
+        with ProcessPoolExecutor() as executor:
+            executor.map(convertYamlTojsonPartial, comps)
+
         return comps
     else:
         return None
@@ -109,7 +116,8 @@ def updateYamls():
 def setUpAllYamls():
     if(os.path.exists('services/components')) is False:
         os.makedirs('services/components')
-	
+
+        all_files = []
 	counter = 1
 
 	while(counter != 0):
@@ -123,18 +131,26 @@ def setUpAllYamls():
             result = json.loads(result)
             files = ["components/"+comp.get('name') for comp in result]
 
-            all_files = all_files.extend(files)
+            all_files.extend(files)
             
             if(len(files) < 100):
                 counter = 0
             else:
                 counter = counter + 1
 
-        for f in all_files:
-            get_updated_file(f)
-            comp = f.split('/')[1].split('.')[0]
-            convertYamlTojson(comp,convert=True)
+
+        ###### Multi Threading ####### -> API Calls
+        with ThreadPoolExecutor() as executor:
+            executor.map(get_updated_file, all_files)
+
+        ###### Multi Processing ###### -> CPU Intensive & I/O Bound
+        all_comps = list(map(lambda f:f.split('/')[2].split('.')[0], all_files))
+	with ProcessPoolExecutor() as executor:
+            executor.map(convertYamlTojson, all_comps)
+
+
         get_diff_on_commit_ids()
+
         return True
     else:
         return None
