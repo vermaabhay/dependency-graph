@@ -118,9 +118,9 @@ def setUpAllYamls():
         os.makedirs('services/components')
 
         all_files = []
-	counter = 1
+        counter = 1
 
-	while(counter != 0):
+        while(counter != 0):
             page = counter
             per_page = 100
             #url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,path,per_page)
@@ -145,7 +145,7 @@ def setUpAllYamls():
 
         ###### Multi Processing ###### -> CPU Intensive & I/O Bound
         all_comps = list(map(lambda f:f.split('/')[2].split('.')[0], all_files))
-	with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor() as executor:
             executor.map(convertYamlTojson, all_comps)
 
 
