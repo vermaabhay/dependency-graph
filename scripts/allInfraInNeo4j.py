@@ -35,15 +35,15 @@ def dumpAllYamlsNeo4j(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4
 
     error = []
     for comp in comps:
-        if(comp != "nonengg"):
-            document = convertYamlTojson(comp)
 
-            try:
-                graph.run(query_subcomponent, json=document)
-                graph.run(query_dependency, json=document)
-            except Exception as err:
-                error.append(comp)                
-                print(err)
+        document = convertYamlTojson(comp)
+
+        try:
+            graph.run(query_subcomponent, json=document)
+            graph.run(query_dependency, json=document)
+        except Exception as err:
+            error.append(comp)                
+            print(err)
                 
     if(len(error) > 0):
         print("Following YAMLs Are Not Successfully Processed")
