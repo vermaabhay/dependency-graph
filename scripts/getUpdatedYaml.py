@@ -15,13 +15,11 @@ confparser = configparser.RawConfigParser()
 confparser.read('scripts/config.properties')
 
 
-base_url = 'http://gitlab.snapdeal.com'
-api_url = '%s/api/v4' % base_url
+api_url = confparser.get('gitlab','api_url')
 token = confparser.get('gitlab','token')
-project_id = 1346
-project_path = 'devtools/services'
-path = 'components'
-per_page = -1
+project_id = confparser.get('gitlab','project_id')
+project = confparser.get('gitlab','project')
+project_path = confparser.get('gitlab','project_path')
 
 
 def get_last_commit_id():
@@ -123,8 +121,8 @@ def setUpAllYamls():
         while(counter != 0):
             page = counter
             per_page = 100
-            #url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,path,per_page)
-            url = "{0}/projects/{1}/repository/tree?path={2}&page={3}&per_page={4}".format(api_url,project_id,path,counter,per_page)
+            #url = "{0}/projects/{1}/repository/tree?path={2}&per_page={3}".format(api_url,project_id,project_path,per_page)
+            url = "{0}/projects/{1}/repository/tree?path={2}&page={3}&per_page={4}".format(api_url,project_id,project_path,counter,per_page)
             query = Request(url)
             query.add_header('PRIVATE-TOKEN', token)
             result = urlopen(query).read()
