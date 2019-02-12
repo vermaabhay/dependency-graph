@@ -4,11 +4,11 @@ from urllib.request import Request, urlopen
 import base64
 import re
 import os
-from scripts.appProps import convertYamlTojson
 import configparser
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
+from scripts.appProps import convertYamlTojson
 
 
 confparser = configparser.RawConfigParser()

@@ -11,17 +11,17 @@ from pandas.io.json import json_normalize
 import json
 import yaml
 import visdcc
-from scripts import cypherNeo4j
-from scripts.appProps import convertYamlTojson
 import redis
-from scripts.getUpdatedYaml import updateYamls, setUpAllYamls
-from scripts.redisCache import expireCache
 from flask import redirect, request
-from scripts.time_tracker import TimeTracker
 import logging
 from pandas import DataFrame, Series
-from scripts.allInfraInNeo4j import dumpAllYamlsNeo4j
 import configparser
+from scripts import cypherNeo4j
+from scripts.appProps import convertYamlTojson
+from scripts.allInfraInNeo4j import dumpAllYamlsNeo4j
+from scripts.getUpdatedYaml import updateYamls, setUpAllYamls
+from scripts.redisCache import expireCache
+from scripts.time_tracker import TimeTracker
 
 
 confparser = configparser.RawConfigParser()
