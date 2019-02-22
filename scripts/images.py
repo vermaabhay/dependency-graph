@@ -1,7 +1,7 @@
 import requests
 
 data = {
-"default" : "https://www.snapdeal.com/img/icons/finalFavicon.ico",
+"default" : "https://cdn1.iconfinder.com/data/icons/universal-mobile-line-icons-vol-3/48/130-512.png",
 "aerospike" : "https://d1q6f0aelx0por.cloudfront.net/product-logos/c59ad037-0e53-4b0d-bee5-766397f3b40e-949b9260-e34e-4964-ba74-bfbd18607b71-ac72c493-71fb-44fb-89ac-f296cd8cef43-logo-large.png",
 "aerospikecache" : "https://d1q6f0aelx0por.cloudfront.net/product-logos/c59ad037-0e53-4b0d-bee5-766397f3b40e-949b9260-e34e-4964-ba74-bfbd18607b71-ac72c493-71fb-44fb-89ac-f296cd8cef43-logo-large.png",
 "activemq" : "https://www.signalfx.com/wp-content/uploads/integrations_activemq@4x-500x500.png",

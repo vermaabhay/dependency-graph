@@ -102,7 +102,7 @@ def appImage(app_type):
 'telegraf'      : '/assets/imgs/telegraf.png', 
 'vault'         : '/assets/imgs/vault.png'
 }
-    default = "https://www.snapdeal.com/img/icons/finalFavicon.ico"
+    default = "https://cdn1.iconfinder.com/data/icons/universal-mobile-line-icons-vol-3/48/130-512.png"
     image_url = image_dict.get(app_type, default)
     return image_url
 
