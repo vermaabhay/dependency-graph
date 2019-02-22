@@ -62,7 +62,7 @@ redis_db = redis.StrictRedis(host=redis_host, charset="utf-8", port=redis_port, 
 def get_header():
         # Page Header
     header = html.Div([
-        html.H4('Snapdeal Infra Dependency Graph',style={'textAlign': 'center'})
+        html.H4('Infra Dependency Graph',style={'textAlign': 'center'})
     ])
     return header
 
