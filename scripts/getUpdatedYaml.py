@@ -64,7 +64,7 @@ def get_diff_on_commit_ids():
             diff_str_all = diff.get('diff')
             diff_str_match = re.findall('^[+-].*', diff_str_all, re.MULTILINE)
             diff_str = ''.join(diff_str_match)
-            if(re.search(r'(^{0})'.format(comp_dep),diff_str) or re.search(r'(^{0})'.format(subcomp_dep),diff_str) or re.search(r'(^{0})'.format(name),diff_str)):
+            if(re.search(r'({0})'.format(comp_dep),diff_str) or re.search(r'({0})'.format(subcomp_dep),diff_str) or re.search(r'({0})'.format(name),diff_str)):
                 files.append(diff.get('new_path'))
         for f in files:
             get_updated_file(f)
@@ -108,6 +108,7 @@ def updateYamls():
 
         return comps
     else:
+        print("No Dependencies Altered In Infra")
         return None
 
 
