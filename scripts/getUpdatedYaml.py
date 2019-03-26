@@ -138,11 +138,11 @@ def setUpAllYamls():
                 counter = counter + 1
 
 
-        ###### Multi Threading ####### -> API Calls
+        ###### Multi Threading ####### -> API Calls & I/O Bound
         with ThreadPoolExecutor() as executor:
             executor.map(get_updated_file, all_files)
 
-        ###### Multi Processing ###### -> CPU Intensive & I/O Bound
+        ###### Multi Processing ###### -> CPU Intensive
         all_comps = list(map(lambda f:f.split('/')[1].split('.')[0], all_files))
         with ProcessPoolExecutor() as executor:
             executor.map(convertYamlTojson, all_comps)
