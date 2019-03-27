@@ -4,6 +4,7 @@
 #
 #    pip-compile --output-file requirements.txt requirements.in
 #
+apscheduler==3.6.0
 atomicwrites==1.2.1       # via pytest
 attrs==18.2.0             # via pytest
 certifi==2018.11.29       # via requests, urllib3

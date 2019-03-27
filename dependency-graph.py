@@ -22,6 +22,7 @@ from scripts.allInfraInNeo4j import dumpAllYamlsNeo4j
 from scripts.getUpdatedYaml import updateYamls, setUpAllYamls
 from scripts.redisCache import expireCache
 from scripts.time_tracker import TimeTracker
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
 confparser = configparser.RawConfigParser()
@@ -407,8 +408,7 @@ def comp_subcomp_dep_table(value):
 
 @server.route('/update')
 def update():
-    url = request.url
-    new_url = url.replace('/update','')
+
     updated_comps = updateYamls()
     if(updated_comps):
         try:
@@ -416,11 +416,14 @@ def update():
             expireCache(redis_db,updated_comps)
             neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass = load_neo4j_config('neo4j-overall-infra')
             dumpAllYamlsNeo4j(neo4j_host,neo4j_http_port,neo4j_bolt_port,neo4j_user,neo4j_pass)
-            return redirect(new_url, code=302)
         except Exception as err:
-            return redirect(new_url, code=302)
-    else:
+            print("Got Following Exception While Updating Yamls:",err)
+    if(request):
+        url = request.url
+        new_url = url.replace('/update','')
         return redirect(new_url, code=302)
+    else:
+        return None
 
 
 @server.route('/initialsetup')
@@ -434,6 +437,11 @@ def setup():
         return redirect(new_url, code=302)
     except Exception as err:
         return redirect(new_url, code=302)
+
+
+sched = BackgroundScheduler(daemon=True)
+sched.add_job(update,'interval',minutes=30)
+sched.start()
 
 # start Flask server
 if __name__ == '__main__':
