@@ -22,7 +22,7 @@ project = confparser.get('gitlab','project')
 project_path = confparser.get('gitlab','project_path')
 
 
-def get_last_commit_id():
+def get_commit_ids():
     url = "{0}/projects/{1}/repository/commits".format(api_url,project_id)
     query = Request(url)
     query.add_header('PRIVATE-TOKEN', token)
@@ -30,16 +30,7 @@ def get_last_commit_id():
     result = json.loads(result)
     last_commit = sorted(result, key=lambda k: k['created_at'],reverse=True)[0]
     last_commit_id = last_commit.get('id')
-    return last_commit_id
 
-
-def get_diff_on_commit_ids():
-    comp_dep = "component:"
-    subcomp_dep = "subcomponent:"
-    name = "name:"
-
-    last_commit_id = get_last_commit_id()
-   
     prev_commit_id_file = 'services/components/prev_commit_id.txt'
 
     if os.path.isfile(prev_commit_id_file):
@@ -51,6 +42,17 @@ def get_diff_on_commit_ids():
         file_name.write(last_commit_id)
         prev_commit_id = last_commit_id
         file_name.close()
+
+    return prev_commit_id,last_commit_id
+
+
+def get_diff_on_commit_ids():
+    comp_dep = "component:"
+    subcomp_dep = "subcomponent:"
+    name = "name:"
+
+    prev_commit_id,last_commit_id = get_commit_ids()
+
         
     if(prev_commit_id != last_commit_id):
         url = "{0}/projects/{1}/repository/compare?from={2}&to={3}".format(api_url,project_id,prev_commit_id,last_commit_id)
@@ -66,8 +68,11 @@ def get_diff_on_commit_ids():
             diff_str = ''.join(diff_str_match)
             if(re.search(r'({0})'.format(comp_dep),diff_str) or re.search(r'({0})'.format(subcomp_dep),diff_str) or re.search(r'({0})'.format(name),diff_str)):
                 files.append(diff.get('new_path'))
-        for f in files:
-            get_updated_file(f)
+
+        #for f in files:
+        #    get_updated_file(f)
+
+	map(get_updated_file,files)
 
         file_name = open('services/components/prev_commit_id.txt','w')
         file_name.write(last_commit_id)
@@ -93,6 +98,8 @@ def get_updated_file(file_name):
         new_file.close()
 
 def updateYamls():
+
+    setUpAllYamls()
     
     files = get_diff_on_commit_ids()
     if(files):
@@ -115,6 +122,8 @@ def updateYamls():
 def setUpAllYamls():
     if(os.path.exists('services/components')) is False:
         os.makedirs('services/components')
+
+        get_diff_on_commit_ids()
 
         all_files = []
         counter = 1
@@ -147,8 +156,6 @@ def setUpAllYamls():
         with ProcessPoolExecutor() as executor:
             executor.map(convertYamlTojson, all_comps)
 
-
-        get_diff_on_commit_ids()
 
         return True
     else:
