@@ -69,10 +69,12 @@ def get_diff_on_commit_ids():
             if(re.search(r'({0})'.format(comp_dep),diff_str) or re.search(r'({0})'.format(subcomp_dep),diff_str) or re.search(r'({0})'.format(name),diff_str)):
                 files.append(diff.get('new_path'))
 
+
+        files = filter(lambda fname : fname.startswith('component'), files)
+	map(get_updated_file,files)
+
         #for f in files:
         #    get_updated_file(f)
-
-	map(get_updated_file,files)
 
         file_name = open('services/components/prev_commit_id.txt','w')
         file_name.write(last_commit_id)
